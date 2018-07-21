@@ -19,4 +19,4 @@ This file is read every map change or when the plugin is reloaded.
 
 By default, the weapons deagle, mp7 and mag7 are configured.
 
-The entity name of the weapons ("weapon_\*") for CS:GO can be found [here](https://developer.valvesoftware.com/wiki/List_of_Counter-Strike:_Global_Offensive_Entities).
+**Remark:** The entity name of the weapons ("weapon_\*") for CS:GO can be found [here](https://developer.valvesoftware.com/wiki/List_of_Counter-Strike:_Global_Offensive_Entities).
