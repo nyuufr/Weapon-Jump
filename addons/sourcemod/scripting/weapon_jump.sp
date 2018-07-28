@@ -1,22 +1,25 @@
 
 /* ========================================================================= */
+/* PRAGMAS                                                                   */
+/* ========================================================================= */
+
+#pragma semicolon 1
+#pragma newdecls  required
+
+/* ========================================================================= */
 /* INCLUDES                                                                  */
 /* ========================================================================= */
 
 #include <sourcemod>
-#include <sdktools>
 #include <sdkhooks>
-#include <cstrike>
-
-#pragma semicolon 1
-#pragma newdecls  required
+#include <sdktools>
 
 /* ========================================================================= */
 /* DEFINES                                                                   */
 /* ========================================================================= */
 
 /* Plugin version                                                            */
-#define C_PLUGIN_VERSION                "3.1.0"
+#define C_PLUGIN_VERSION                "3.1.1"
 
 /* ------------------------------------------------------------------------- */
 
@@ -30,7 +33,7 @@
 #define C_WEAPON_PROPERTY_MAXIMUM       (3)
 
 /* ========================================================================= */
-/* GLOBAL CONSTANTS                                                          */
+/* GLOBAL VARIABLES                                                          */
 /* ========================================================================= */
 
 /* Plugin information                                                        */
@@ -41,14 +44,12 @@ public Plugin myinfo =
     description = "Knockback the players when shooting",
     version     = C_PLUGIN_VERSION,
     url         = "https://forums.alliedmods.net/showthread.php?t=292151"
-}
+};
 
-/* ========================================================================= */
-/* GLOBAL VARIABLES                                                          */
-/* ========================================================================= */
+/* ------------------------------------------------------------------------- */
 
-/* Plugin late loading                                                       */
-bool      gl_bPluginLateLoading;
+/* Plugin late                                                               */
+bool      gl_bPluginLate;
 
 /* Players weapon jump                                                       */
 bool      gl_bPlayerWeaponJump        [MAXPLAYERS + 1];
@@ -63,8 +64,8 @@ StringMap gl_hMapWeaponProperties;
 /* Plugin enable cvar                                                        */
 ConVar    gl_hCvarPluginEnable;
 
-/* Plugin enable cvar value                                                  */
-bool      gl_bCvarPluginEnable;
+/* Plugin enable                                                             */
+bool      gl_bPluginEnable;
 
 /* ========================================================================= */
 /* FUNCTIONS                                                                 */
@@ -76,14 +77,18 @@ bool      gl_bCvarPluginEnable;
 
 public APLRes AskPluginLoad2(Handle hMySelf, bool bLate, char[] szError, int iErrorMaxLen)
 {
-    // Cache plugin late loading status
-    gl_bPluginLateLoading = bLate;
+    // Save the plugin late status
+    gl_bPluginLate = bLate;
     
+    // Continue
     return APLRes_Success;
 }
 
 public void OnPluginStart()
 {
+    // Check the engine version
+    PluginCheckEngineVersion();
+    
     // Initialize the cvars
     CvarInitialize();
 
@@ -93,29 +98,40 @@ public void OnPluginStart()
     // Hook the weapon fire event
     HookEvent("weapon_fire", OnWeaponFirePost, EventHookMode_Post);
     
-    // Check for plugin late loading
-    if (gl_bPluginLateLoading)
+    // Check the plugin late status
+    PluginCheckLate();
+}
+
+void PluginCheckEngineVersion()
+{
+    // Check the engine version
+    if (GetEngineVersion() != Engine_CSGO)
     {
-        PluginStartLate();
+        // Stop the plugin
+        SetFailState("This plugin is for CS:GO only !");
     }
 }
 
-void PluginStartLate()
+void PluginCheckLate()
 {
-    // Process the players already on the server
-    for (int iPlayer = 1 ; iPlayer <= MaxClients ; iPlayer++)
+    // Check if the plugin loads late
+    if (gl_bPluginLate)
     {
-        // Check if the player is connected
-        if (IsClientConnected(iPlayer))
+        // Process the clients already on the server
+        for (int iClient = 1 ; iClient <= MaxClients ; iClient++)
         {
-            // Call the client connected forward
-            OnClientConnected(iPlayer);
-                
-            // Check if the player is in game
-            if (IsClientInGame(iPlayer))
+            // Check if the client is connected
+            if (IsClientConnected(iClient))
             {
-                // Call the client put in server forward
-                OnClientPutInServer(iPlayer);
+                // Call the client connected forward
+                OnClientConnected(iClient);
+                
+                // Check if the client is in game
+                if (IsClientInGame(iClient))
+                {
+                    // Call the client put in server forward
+                    OnClientPutInServer(iClient);
+                }
             }
         }
     }
@@ -147,7 +163,7 @@ public void OnConfigsExecuted()
         if (kvConfig.GotoFirstSubKey())
         {
             char szWeaponName[32];
-            int  arrWeaponProperty[C_WEAPON_PROPERTY_MAXIMUM];
+            int  iWeaponProperty[C_WEAPON_PROPERTY_MAXIMUM];
             
             do
             {
@@ -176,12 +192,12 @@ public void OnConfigsExecuted()
                     }
                     
                     // Convert the weapon properties
-                    arrWeaponProperty[C_WEAPON_PROPERTY_KNOCKBACK] = view_as<int>(flKnockback);
-                    arrWeaponProperty[C_WEAPON_PROPERTY_VELOCITY]  = view_as<int>(flVelocity);
-                    arrWeaponProperty[C_WEAPON_PROPERTY_GROUND]    = view_as<int>(bGround);
+                    iWeaponProperty[C_WEAPON_PROPERTY_KNOCKBACK] = view_as<int>(flKnockback);
+                    iWeaponProperty[C_WEAPON_PROPERTY_VELOCITY]  = view_as<int>(flVelocity);
+                    iWeaponProperty[C_WEAPON_PROPERTY_GROUND]    = view_as<int>(bGround);
                     
                     // Push the weapon properties in the stringmap
-                    gl_hMapWeaponProperties.SetArray(szWeaponName, arrWeaponProperty, C_WEAPON_PROPERTY_MAXIMUM);
+                    gl_hMapWeaponProperties.SetArray(szWeaponName, iWeaponProperty, C_WEAPON_PROPERTY_MAXIMUM);
                     
                     LogMessage("Read \"%s\" (Knockback: %0.2f | Velocity: %0.2f | Ground: %d).", 
                         szWeaponName, flKnockback, flVelocity, bGround);
@@ -203,7 +219,7 @@ public void OnConfigsExecuted()
 }
 
 /* ------------------------------------------------------------------------- */
-/* Cvar                                                                      */
+/* Console variable                                                          */
 /* ------------------------------------------------------------------------- */
 
 void CvarInitialize()
@@ -215,7 +231,7 @@ void CvarInitialize()
     gl_hCvarPluginEnable = CreateConVar("sm_weapon_jump_enable", "1", "Enable the plugin", _, true, 0.0, true, 1.0);
     
     // Cache the custom cvars values
-    gl_bCvarPluginEnable = gl_hCvarPluginEnable.BoolValue;
+    gl_bPluginEnable = gl_hCvarPluginEnable.BoolValue;
     
     // Hook the custom cvars change
     gl_hCvarPluginEnable.AddChangeHook(OnCvarChanged);
@@ -224,7 +240,7 @@ void CvarInitialize()
 public void OnCvarChanged(ConVar hCvar, const char[] szOldValue, const char[] szNewValue)
 {
     // Cache the custom cvars values
-    if (gl_hCvarPluginEnable == hCvar) gl_bCvarPluginEnable = gl_hCvarPluginEnable.BoolValue;
+    if (gl_hCvarPluginEnable == hCvar) gl_bPluginEnable = gl_hCvarPluginEnable.BoolValue;
 }
 
 /* ------------------------------------------------------------------------- */
@@ -234,10 +250,7 @@ public void OnCvarChanged(ConVar hCvar, const char[] szOldValue, const char[] sz
 public void OnClientConnected(int iClient)
 {
     // Initialize the client data
-    gl_bPlayerWeaponJump        [iClient]    = false;
-    gl_vPlayerWeaponJumpVelocity[iClient][0] = 0.0;
-    gl_vPlayerWeaponJumpVelocity[iClient][1] = 0.0;
-    gl_vPlayerWeaponJumpVelocity[iClient][2] = 0.0;
+    gl_bPlayerWeaponJump[iClient] = false;
 }
 
 public void OnClientPutInServer(int iClient)
@@ -249,10 +262,7 @@ public void OnClientPutInServer(int iClient)
 public void OnClientDisconnect(int iClient)
 {
     // Clear the client data
-    gl_bPlayerWeaponJump        [iClient]    = false;
-    gl_vPlayerWeaponJumpVelocity[iClient][0] = 0.0;
-    gl_vPlayerWeaponJumpVelocity[iClient][1] = 0.0;
-    gl_vPlayerWeaponJumpVelocity[iClient][2] = 0.0;
+    gl_bPlayerWeaponJump[iClient] = false;
 }
 
 /* ------------------------------------------------------------------------- */
@@ -262,7 +272,7 @@ public void OnClientDisconnect(int iClient)
 public void OnWeaponFirePost(Event hEvent, const char[] szName, bool bDontBroadcast)
 {
     // Check if the plugin is enabled
-    if (gl_bCvarPluginEnable)
+    if (gl_bPluginEnable)
     {
         // Get the player
         int iPlayer = GetClientOfUserId(hEvent.GetInt("userid"));
@@ -277,21 +287,21 @@ public void OnWeaponFirePost(Event hEvent, const char[] szName, bool bDontBroadc
             if (GetEntProp(iWeapon, Prop_Send, "m_iClip1") > 0)
             {
                 char szWeaponName[32];
-                int  arrWeaponProperty[C_WEAPON_PROPERTY_MAXIMUM];
+                int  iWeaponProperty[C_WEAPON_PROPERTY_MAXIMUM];
                 
                 // Get the weapon name
                 hEvent.GetString("weapon", szWeaponName, sizeof(szWeaponName));
                 
                 // Check if the weapon name is present in the weapon properties stringmap
-                if (gl_hMapWeaponProperties.GetArray(szWeaponName, arrWeaponProperty, C_WEAPON_PROPERTY_MAXIMUM))
+                if (gl_hMapWeaponProperties.GetArray(szWeaponName, iWeaponProperty, C_WEAPON_PROPERTY_MAXIMUM))
                 {
                     // Convert the weapon properties
-                    float flKnockback = view_as<float>(arrWeaponProperty[C_WEAPON_PROPERTY_KNOCKBACK]);
-                    float flVelocity  = view_as<float>(arrWeaponProperty[C_WEAPON_PROPERTY_VELOCITY]);
-                    bool  bGround     = view_as<bool> (arrWeaponProperty[C_WEAPON_PROPERTY_GROUND]);
+                    float flKnockback = view_as<float>(iWeaponProperty[C_WEAPON_PROPERTY_KNOCKBACK]);
+                    float flVelocity  = view_as<float>(iWeaponProperty[C_WEAPON_PROPERTY_VELOCITY]);
+                    bool  bGround     = view_as<bool> (iWeaponProperty[C_WEAPON_PROPERTY_GROUND]);
                     
                     // Check if the player can weapon jump on ground
-                    if (!(GetEntityFlags(iPlayer) & FL_ONGROUND) || bGround)
+                    if (bGround || !(GetEntityFlags(iPlayer) & FL_ONGROUND))
                     {
                         float vPlayerVelocity[3];
                         float vPlayerEyeAngles[3];
