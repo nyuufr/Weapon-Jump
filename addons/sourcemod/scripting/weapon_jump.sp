@@ -75,7 +75,7 @@ bool      gl_bPluginEnable;
 /* Plugin                                                                    */
 /* ------------------------------------------------------------------------- */
 
-public APLRes AskPluginLoad2(Handle hMySelf, bool bLate, char[] szError, int iErrorMaxLen)
+public APLRes AskPluginLoad2(Handle hMyself, bool bLate, char[] szError, int iErrorMaxLength)
 {
     // Save the plugin late status
     gl_bPluginLate = bLate;
@@ -282,6 +282,8 @@ public void OnWeaponFirePost(Event hEvent, const char[] szName, bool bDontBroadc
         {
             // Get the player active weapon
             int iWeapon = GetEntPropEnt(iPlayer, Prop_Send, "m_hActiveWeapon");
+            
+            // TODO: Maybe a check must be done here on 'iWeapon' (!= -1, IsValidEntity()..).
             
             // Check the current number of ammo in the loader
             if (GetEntProp(iWeapon, Prop_Send, "m_iClip1") > 0)
